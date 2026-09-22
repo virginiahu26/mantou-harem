@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>馒头的后宫 - 多人实时共享好感度排行榜</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sakura: {
+                            50: '#fff5f7',
+                            100: '#ffe3ec',
+                            200: '#ffcce0',
+                            300: '#ffa8cb',
+                            400: '#ff71a5',
+                            500: '#f83b82',
+                            600: '#e31b63',
+                            700: '#be0f4a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e8eaf6 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(233, 30, 99, 0.08);
+        }
+
+        .glass-card-gold {
+            background: linear-gradient(135deg, rgba(255, 253, 231, 0.92), rgba(255, 236, 179, 0.85));
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 215, 0, 0.8);
+            box-shadow: 0 10px 35px 0 rgba(255, 193, 7, 0.3);
+        }
+
+        .floating-heart-bg {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatUp 8s linear infinite;
+            opacity: 0.35;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(100vh) scale(0.5) rotate(0deg); opacity: 0.6; }
+            100% { transform: translateY(-10vh) scale(1.2) rotate(360deg); opacity: 0; }
+        }
+
+        .heart-pop {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            font-weight: 800;
+            animation: popAndFade 1.2s ease-out forwards;
+        }
+
+        @keyframes popAndFade {
+            0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
+            50% { transform: translate(-50%, -100%) scale(1.3); opacity: 0.9; }
+            100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+        }
+
+        .glow-effect {
+            animation: glow 2.5s infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 12px rgba(248, 59, 130, 0.3), 0 0 24px rgba(248, 59, 130, 0.2); }
+            to { box-shadow: 0 0 25px rgba(248, 59, 130, 0.6), 0 0 40px rgba(248, 59, 130, 0.4); }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800 relative pb-16">
+
+    <div id="heartBgContainer"></div>
+
+    <header class="sticky top-0 z-40 backdrop-blur-md bg-white/60 border-b border-pink-100/80 px-4 py-3 shadow-sm">
+        <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-400 to-rose-500 flex items-center justify-center text-white text-xl shadow-md">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl sm:text-2xl font-black bg-gradient-to-r from-pink-600 via-rose-500 to-purple-600 bg-clip-text text-transparent">
+                            馒头的后宫
+                        </h1>
+                        <span id="syncStatus" class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold border border-amber-200">
+                            <i class="fa-solid fa-spinner animate-spin text-[10px]"></i> 连接云端中...
+                        </span>
+                    </div>
+                    <p class="text-xs text-pink-500 font-medium">多人实时同步 · 恋爱模拟器好感度排行榜</p>
+                </div>
+            </div>
+
+            <!-- 顶部工具栏 -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openAddModal()" class="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold px-3.5 py-1.5 rounded-full shadow hover:shadow-pink-300/50 transition-all flex items-center gap-1.5 text-xs sm:text-sm">
+                    <i class="fa-solid fa-heart-circle-plus"></i>
+                    <span>纳妃/纳妾</span>
+                </button>
+                <button onclick="triggerRandomInteration()" class="bg-purple-500 hover:bg-purple-600 text-white font-bold px-3 py-1.5 rounded-full shadow hover:shadow-purple-200 transition-all text-xs sm:text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>翻牌子</span>
+                </button>
+                <button onclick="toggleLogModal()" class="bg-white/80 hover:bg-white text-pink-600 border border-pink-200 font-semibold px-3 py-1.5 rounded-full transition-all text-xs sm:text-sm flex items-center gap-1">
+                    <i class="fa-solid fa-book-heart"></i>
+                    <span>起居注</span>
+                </button>
+                <button onclick="toggleDeployModal()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold px-3 py-1.5 rounded-full transition-all text-xs sm:text-sm flex items-center gap-1">
+                    <i class="fa-solid fa-share-nodes"></i>
+                    <span>发给朋友</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-8 relative z-10">
+
+        <!-- 部署分享顶部卡片提示 -->
+        <div id="deployBanner" class="bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-rose-500/10 border border-pink-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-pink-500 text-white flex items-center justify-center flex-shrink-0 text-lg">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div>
+                    <h3 class="text-xs sm:text-sm font-bold text-gray-800">想要和朋友们同时在线修改排行榜？</h3>
+                    <p class="text-xs text-gray-500">点击右侧按钮查看如何免费将本网页发布到网上，让所有人打开同一个网址实时同步！</p>
+                </div>
+            </div>
+            <button onclick="toggleDeployModal()" class="px-4 py-1.5 bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs rounded-xl shadow transition-colors flex-shrink-0">
+                查看部署教程
+            </button>
+        </div>
+
+        <!-- 正宫独宠专属看板 -->
+        <section id="empressSection" class="w-full">
+            <!-- JS 实时同步动态渲染正宫 -->
+        </section>
+
+        <!-- 列表搜素与筛选工具条 -->
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white/50 p-3 rounded-2xl border border-white/70 shadow-sm backdrop-blur-sm">
+            <div class="flex items-center gap-2">
+                <span class="text-base sm:text-lg font-bold text-gray-700 flex items-center gap-1">
+                    <i class="fa-solid fa-ranking-star text-pink-500"></i> 后宫美眷榜
+                </span>
+                <span id="totalCountBadge" class="bg-pink-100 text-pink-600 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                    共 0 位
+                </span>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div class="relative flex-1 sm:w-48">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-pink-300 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="renderApp()" placeholder="搜索爱妃名/标签..." class="w-full pl-8 pr-3 py-1.5 text-xs sm:text-sm rounded-full border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400/50 bg-white/80">
+                </div>
+                <select id="sortBy" onchange="renderApp()" class="px-3 py-1.5 text-xs sm:text-sm rounded-full border border-pink-200 bg-white/80 text-gray-700 focus:outline-none focus:ring-2 focus:ring-pink-400/50 font-medium">
+                    <option value="favor-desc">好感度高 → 低</option>
+                    <option value="favor-asc">好感度低 → 高</option>
+                    <option value="name">名字排序</option>
+                    <option value="updated">最新变动</option>
+                </select>
+                <button onclick="seedInitialData()" class="px-3 py-1.5 text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 font-bold rounded-full transition-colors flex items-center gap-1" title="初始化云端默认样例">
+                    <i class="fa-solid fa-arrows-rotate"></i> 重置样例
+                </button>
+            </div>
+        </div>
+
+        <!-- 角色排行榜网格 -->
+        <section id="characterGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- JS 实时渲染卡片 -->
+        </section>
+
+    </main>
+
+    <div id="characterModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white/95 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-pink-100 relative max-h-[90vh] overflow-y-auto no-scrollbar">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full flex items-center justify-center bg-gray-100">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2 id="modalTitle" class="text-xl font-bold text-pink-600 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-heart"></i> 纳为佳丽
+            </h2>
+
+            <form id="characterForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                <input type="hidden" id="charId">
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">姓名 / 称呼 *</label>
+                    <input type="text" id="charName" required placeholder="如：顾清寒、夏目樱香、小桃..." class="w-full px-3.5 py-2 text-sm rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">选择预设或输入头像URL</label>
+                    <div class="flex items-center gap-2 mb-2 overflow-x-auto py-1 no-scrollbar" id="presetAvatars"></div>
+                    <input type="url" id="charAvatarUrl" placeholder="图片 URL 链接..." class="w-full px-3 py-1.5 text-xs rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+                    <div class="mt-2 flex items-center gap-3">
+                        <span class="text-xs text-gray-400">当前预览：</span>
+                        <img id="avatarPreview" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" class="w-10 h-10 rounded-full object-cover border-2 border-pink-300">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">初始好感度 (0 - 999)</label>
+                        <input type="number" id="charFavor" min="0" max="999" value="50" required class="w-full px-3 py-2 text-sm rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">主题色系</label>
+                        <select id="charColor" class="w-full px-3 py-2 text-sm rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 bg-white">
+                            <option value="pink">浪漫粉红</option>
+                            <option value="purple">梦幻紫</option>
+                            <option value="blue">清澈蓝</option>
+                            <option value="amber">元气橙</option>
+                            <option value="emerald">清新绿</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">性格/人设标签 (多个用逗号隔开)</label>
+                    <input type="text" id="charTags" placeholder="例如：傲娇, 青梅竹马, 师姐" class="w-full px-3 py-2 text-sm rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">经典名言 / 口头禅</label>
+                    <textarea id="charQuote" rows="2" placeholder="例如：才、才不是专门给你准备的奶茶呢！" class="w-full px-3 py-2 rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400 text-sm"></textarea>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 font-medium text-xs">取消</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold shadow-md hover:from-pink-600 text-xs">实时存入云端</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 调分原因模态框 -->
+    <div id="logReasonModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white/95 rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-pink-100">
+            <h3 class="text-base font-bold text-gray-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-pen-to-square text-pink-500"></i> 写入起居注
+            </h3>
+            <p id="logReasonSubtitle" class="text-xs text-gray-500 mb-3"></p>
+            <div class="space-y-2 mb-4">
+                <input type="text" id="operatorNameInput" placeholder="你的名字/昵称 (如：馒头)" class="w-full px-3 py-2 text-xs rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+                <input type="text" id="logReasonInput" placeholder="变动原因 (如：送了冰淇淋、陪看电影)" class="w-full px-3 py-2 text-xs rounded-xl border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-400">
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeLogReasonModal(false)" class="px-3.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-xs font-medium">跳过说明</button>
+                <button onclick="closeLogReasonModal(true)" class="px-4 py-1.5 rounded-lg bg-pink-500 text-white text-xs font-bold hover:bg-pink-600">实时广播同步</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 变动历史记录起居注 -->
+    <div id="historyModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white/95 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-pink-100 max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b border-pink-100">
+                <h3 class="text-lg font-bold text-pink-600 flex items-center gap-2">
+                    <i class="fa-solid fa-book-bookmark"></i> 后宫起居注 (全员实时日志)
+                </h3>
+                <button onclick="toggleLogModal()" class="text-gray-400 hover:text-gray-600 w-7 h-7 rounded-full flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="logList" class="overflow-y-auto space-y-2.5 flex-1 pr-1 text-xs no-scrollbar">
+                <!-- 动态渲染日志 -->
+            </div>
+            <div class="mt-4 pt-2 border-t border-gray-100 flex justify-between items-center">
+                <span class="text-[11px] text-gray-400">实时更新中...</span>
+                <button onclick="toggleLogModal()" class="px-4 py-1.5 bg-pink-500 text-white rounded-xl text-xs font-bold">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 部署分享教程弹窗 -->
+    <div id="deployModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white/95 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-pink-100 relative max-h-[85vh] overflow-y-auto no-scrollbar">
+            <button onclick="toggleDeployModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 w-8 h-8 rounded-full flex items-center justify-center bg-gray-100">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-lg font-bold text-pink-600 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-rocket"></i> 如何免费发布给朋友同时在线玩？
+            </h3>
+            <div class="space-y-3 text-xs text-gray-600 leading-relaxed">
+                <div class="p-3 bg-pink-50/70 rounded-xl border border-pink-100">
+                    <p class="font-bold text-gray-800 mb-1">✨ 为什么必须部署到网上？</p>
+                    <p>当这个 HTML 保存到你自己电脑时，路径是 <code class="bg-white px-1 rounded text-pink-600">C:\Users\...</code>。把它上传到免费托管服务器后，会生成一个专属公共网址，所有人访问同一个网址就能通过内置云端实时同步！</p>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="font-bold text-gray-800">推荐方式 1：GitHub Pages (完全免费/最流行)</p>
+                    <ol class="list-decimal pl-4 space-y-1">
+                        <li>注册/登录 <a href="https://github.com" target="_blank" class="text-pink-600 font-bold underline">GitHub.com</a>。</li>
+                        <li>新建一个仓库 (Repository)，名字设为 <code class="bg-gray-100 px-1">mantou-harem</code>。</li>
+                        <li>将本网页重命名为 <code class="bg-gray-100 px-1">index.html</code> 并上传到仓库主分支。</li>
+                        <li>进入仓库 <code class="bg-gray-100 px-1">Settings -> Pages</code>，分支选择 <code class="bg-gray-100 px-1">main</code> 保存。</li>
+                        <li>等待 1 分钟即可得到可分享的链接！</li>
+                    </ol>
+                </div>
+
+                <div class="space-y-2">
+                    <p class="font-bold text-gray-800">推荐方式 2：Vercel / Netlify (一键拖拽部署)</p>
+                    <ol class="list-decimal pl-4 space-y-1">
+                        <li>登录 <a href="https://vercel.com" target="_blank" class="text-pink-600 font-bold underline">Vercel.com</a> 或 <a href="https://netlify.com" target="_blank" class="text-pink-600 font-bold underline">Netlify.com</a>。</li>
+                        <li>把包含 `index.html` 的文件夹直接拖拽到 Upload 区域。</li>
+                        <li>自动生成可访问的免费 `.vercel.app` 链接发给朋友！</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="mt-5 text-right">
+                <button onclick="toggleDeployModal()" class="px-5 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold rounded-xl text-xs shadow-md">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 随机翻牌子弹窗 -->
+    <div id="randomCardModal" class="fixed inset-0 bg-black/50 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gradient-to-b from-white to-pink-50 rounded-3xl max-w-sm w-full p-6 shadow-2xl border-2 border-pink-200 text-center relative">
+            <button onclick="closeRandomModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="text-pink-500 text-3xl mb-2">
+                <i class="fa-solid fa-dice"></i>
+            </div>
+            <h3 class="text-xl font-black text-pink-600 mb-1">翻牌得幸</h3>
+            <p class="text-xs text-gray-500 mb-4">今天馒头大人要去探望哪位爱妃呢？</p>
+
+            <div id="randomCardContent" class="py-3">
+                <div class="w-24 h-24 mx-auto mb-3 rounded-full overflow-hidden border-4 border-pink-300 shadow-md">
+                    <img id="randomCharAvatar" src="" class="w-full h-full object-cover">
+                </div>
+                <h4 id="randomCharName" class="text-lg font-bold text-gray-800"></h4>
+                <p id="randomCharTitle" class="text-xs text-pink-500 font-semibold mt-0.5"></p>
+                <div class="mt-3 bg-pink-100/60 p-3 rounded-xl text-xs text-pink-800 italic">
+                    "<span id="randomCharQuote"></span>"
+                </div>
+            </div>
+
+            <div class="mt-4 flex gap-2">
+                <button onclick="triggerRandomInteration()" class="flex-1 py-2 bg-pink-100 text-pink-600 hover:bg-pink-200 font-bold rounded-xl text-xs transition-colors">
+                    <i class="fa-solid fa-rotate"></i> 再翻一次
+                </button>
+                <button onclick="addFavorFromRandom(5)" class="flex-1 py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-bold rounded-xl text-xs shadow-md hover:from-pink-600">
+                    临幸 (+5好感)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables provided by environment or default fallbacks
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mantou-harem-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyDemoDummyKeyForPreviewModeOnly",
+                authDomain: "demo-app.firebaseapp.com",
+                projectId: "demo-app",
+                storageBucket: "demo-app.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:abcdef"
+            };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Standard Firestore Paths
+        const charsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'characters');
+        const logsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'logs');
+
+        // Preset Avatars
+        const DEFAULT_AVATARS = [
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+            'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
+            'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
+            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'
+        ];
+
+        const INITIAL_SEED_CHARACTERS = [
+            {
+                id: 'char-1',
+                name: '夏目樱香',
+                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+                favor: 120,
+                color: 'pink',
+                tags: ['傲娇', '青梅竹马', '班长'],
+                quote: '笨蛋馒头！才、才不是因为担心你才给你带便当的！',
+                updatedAt: Date.now() - 1000 * 60 * 30
+            },
+            {
+                id: 'char-2',
+                name: '星野琉璃',
+                avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
+                favor: 88,
+                color: 'purple',
+                tags: ['神秘', '同级生', '占星师'],
+                quote: '今天的星象显示，你和我的缘分指数是...100%哦。',
+                updatedAt: Date.now() - 1000 * 60 * 60 * 2
+            },
+            {
+                id: 'char-3',
+                name: '千叶雅子',
+                avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=80',
+                favor: 65,
+                color: 'amber',
+                tags: ['温柔', '学姐', '茶道社'],
+                quote: '馒头学弟，今天放学后要不要来茶道部坐一坐呢？',
+                updatedAt: Date.now() - 1000 * 60 * 60 * 12
+            }
+        ];
+
+        window.characters = [];
+        window.logs = [];
+        window.pendingChange = null;
+        window.currentRandomChar = null;
+
+        // Authentic Initialization
+        async function initAuthAndSync() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                document.getElementById('syncStatus').innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-emerald-700">云端已实时连接</span>
+                `;
+                document.getElementById('syncStatus').className = "inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold border border-emerald-200";
+
+                setupRealtimeListeners();
+            } catch (err) {
+                console.warn("Firebase Authentication / Realtime warning:", err);
+                document.getElementById('syncStatus').innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                    <span class="text-pink-700">离线/单机模式</span>
+                `;
+                // Fallback to local memory
+                window.characters = INITIAL_SEED_CHARACTERS;
+                renderApp();
+            }
+        }
+
+        // Realtime sync listeners
+        function setupRealtimeListeners() {
+            // Listen to characters
+            onSnapshot(charsColRef, (snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => {
+                    list.push(doc.data());
+                });
+
+                if (list.length === 0) {
+                    seedInitialData();
+                } else {
+                    window.characters = list;
+                    renderApp();
+                }
+            }, (error) => {
+                console.error("Characters sync error:", error);
+            });
+
+            // Listen to logs
+            onSnapshot(logsColRef, (snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => list.push(doc.data()));
+                list.sort((a, b) => b.timestamp - a.timestamp);
+                window.logs = list.slice(0, 50);
+                if (!document.getElementById('historyModal').classList.contains('hidden')) {
+                    renderLogList();
+                }
+            }, (error) => {
+                console.error("Logs sync error:", error);
+            });
+        }
+
+        // Global exposing for inline HTML handlers
+        window.seedInitialData = async function() {
+            if (!auth.currentUser) return;
+            try {
+                for (const char of INITIAL_SEED_CHARACTERS) {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'characters', char.id), char);
+                }
+            } catch(e) { console.error(e); }
+        };
+
+        window.quickAdjustFavor = async function(id, delta, event) {
+            const char = window.characters.find(c => c.id === id);
+            if (!char) return;
+
+            if (event) createHeartPop(event.clientX, event.clientY, delta);
+
+            const newFavor = Math.max(0, char.favor + delta);
+            window.pendingChange = {
+                charId: id,
+                charName: char.name,
+                delta: delta
+            };
+
+            if (Math.abs(delta) >= 5) {
+                openLogReasonModal(char.name, delta);
+            } else {
+                await updateCharacterFavor(id, newFavor);
+                await addLogRecord(char.name, delta, delta > 0 ? '日常互动情感升温' : '不小心惹她生气了', '匿名');
+            }
+        };
+
+        async function updateCharacterFavor(id, favor) {
+            if (!auth.currentUser) {
+                const char = window.characters.find(c => c.id === id);
+                if (char) char.favor = favor;
+                renderApp();
+                return;
+            }
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'characters', id), {
+                    favor: favor,
+                    updatedAt: Date.now()
+                });
+            } catch (e) { console.error("Update favor error:", e); }
+        }
+
+        window.closeLogReasonModal = async function(save) {
+            document.getElementById('logReasonModal').classList.add('hidden');
+            if (window.pendingChange) {
+                const char = window.characters.find(c => c.id === window.pendingChange.charId);
+                if (char) {
+                    const newFavor = Math.max(0, char.favor + window.pendingChange.delta);
+                    const reason = save ? (document.getElementById('logReasonInput').value.trim() || '好感度变动') : '快捷互动';
+                    const operator = document.getElementById('operatorNameInput').value.trim() || '馒头的大臣';
+                    await updateCharacterFavor(char.id, newFavor);
+                    await addLogRecord(char.name, window.pendingChange.delta, reason, operator);
+                }
+                window.pendingChange = null;
+            }
+        };
+
+        async function addLogRecord(charName, delta, reason, operator) {
+            if (!auth.currentUser) return;
+            try {
+                const logId = 'log-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'logs', logId), {
+                    id: logId,
+                    name: charName,
+                    delta: delta,
+                    reason: reason,
+                    operator: operator,
+                    timestamp: Date.now()
+                });
+            } catch(e) { console.error("Add log error:", e); }
+        }
+
+        window.handleFormSubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('charId').value || ('char-' + Date.now());
+            const name = document.getElementById('charName').value.trim();
+            const avatar = document.getElementById('charAvatarUrl').value.trim() || DEFAULT_AVATARS[0];
+            const favor = parseInt(document.getElementById('charFavor').value) || 0;
+            const color = document.getElementById('charColor').value;
+            const tags = document.getElementById('charTags').value.split(',').map(t => t.trim()).filter(Boolean);
+            const quote = document.getElementById('charQuote').value.trim();
+
+            const charData = {
+                id, name, avatar, favor, color, tags, quote, updatedAt: Date.now()
+            };
+
+            if (auth.currentUser) {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'characters', id), charData);
+                await addLogRecord(name, favor, '册封纳入后宫', '馒头大人');
+            } else {
+                const idx = window.characters.findIndex(c => c.id === id);
+                if (idx !== -1) window.characters[idx] = charData;
+                else window.characters.push(charData);
+                renderApp();
+            }
+
+            closeModal();
+        };
+
+        window.deleteCharacter = async function(id) {
+            const char = window.characters.find(c => c.id === id);
+            if (!char) return;
+            if (confirm(`确定要将「${char.name}」打入冷宫(删除)吗？所有其他人页面也会实时同步删除！`)) {
+                if (auth.currentUser) {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'characters', id));
+                    await addLogRecord(char.name, 0, '贬入冷宫', '馒头大人');
+                } else {
+                    window.characters = window.characters.filter(c => c.id !== id);
+                    renderApp();
+                }
+            }
+        };
+
+        // UI rendering helper functions
+        window.getFavorTitle = function(favor) {
+            if (favor >= 100) return { title: '正宫独宠 / 独占鳌头', rank: '正宫', color: 'bg-rose-500 text-white' };
+            if (favor >= 80) return { title: '生死相许 / 挚爱佳人', rank: '贵妃', color: 'bg-pink-500 text-white' };
+            if (favor >= 50) return { title: '情深意重 / 甜蜜暧昧', rank: '嫔妃', color: 'bg-purple-500 text-white' };
+            if (favor >= 20) return { title: '怦然心动 / 知心朋友', rank: '贵人', color: 'bg-blue-500 text-white' };
+            return { title: '萍水相逢 / 颔首之交', rank: '答应', color: 'bg-gray-400 text-white' };
+        };
+
+        window.renderApp = function() {
+            const searchKeyword = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+            const sortBy = document.getElementById('sortBy')?.value || 'favor-desc';
+
+            let list = window.characters.filter(c => 
+                c.name.toLowerCase().includes(searchKeyword) || 
+                (c.tags && c.tags.some(t => t.toLowerCase().includes(searchKeyword)))
+            );
+
+            list.sort((a, b) => {
+                if (sortBy === 'favor-desc') return b.favor - a.favor || b.updatedAt - a.updatedAt;
+                if (sortBy === 'favor-asc') return a.favor - b.favor || b.updatedAt - a.updatedAt;
+                if (sortBy === 'name') return a.name.localeCompare(b.name, 'zh-CN');
+                if (sortBy === 'updated') return b.updatedAt - a.updatedAt;
+                return b.favor - a.favor;
+            });
+
+            document.getElementById('totalCountBadge').innerText = `共 ${window.characters.length} 位`;
+
+            renderEmpressSection();
+            renderCharacterGrid(list);
+        };
+
+        function renderEmpressSection() {
+            const empressContainer = document.getElementById('empressSection');
+            if (window.characters.length === 0) {
+                empressContainer.innerHTML = '';
+                return;
+            }
+
+            const sortedByFavor = [...window.characters].sort((a, b) => b.favor - a.favor);
+            const empress = sortedByFavor[0];
+
+            if (!empress || empress.favor < 5) {
+                empressContainer.innerHTML = '';
+                return;
+            }
+
+            const titleInfo = getFavorTitle(empress.favor);
+
+            empressContainer.innerHTML = `
+                <div class="glass-card-gold rounded-3xl p-6 relative overflow-hidden glow-effect transition-all transform hover:-translate-y-0.5">
+                    <div class="absolute -right-6 -bottom-6 opacity-10 text-yellow-600 text-9xl font-black pointer-events-none">
+                        👑
+                    </div>
+                    <div class="flex flex-col md:flex-row items-center gap-6 relative z-10">
+                        <div class="relative">
+                            <div class="w-28 h-28 md:w-32 md:h-32 rounded-full border-4 border-yellow-400 overflow-hidden shadow-xl relative">
+                                <img src="${empress.avatar}" alt="${empress.name}" class="w-full h-full object-cover">
+                            </div>
+                            <span class="absolute -top-3 -right-2 bg-yellow-400 text-yellow-950 font-black text-xs px-3 py-1 rounded-full shadow-lg border border-white flex items-center gap-1">
+                                <i class="fa-solid fa-crown text-amber-700"></i> 正宫娘娘
+                            </span>
+                        </div>
+
+                        <div class="flex-1 text-center md:text-left">
+                            <div class="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-1">
+                                <h2 class="text-2xl font-black text-gray-800">${empress.name}</h2>
+                                <span class="text-xs px-2.5 py-0.5 rounded-full font-bold ${titleInfo.color}">
+                                    ${titleInfo.title}
+                                </span>
+                            </div>
+
+                            <p class="text-xs text-amber-900 font-medium mb-3 italic">
+                                "${empress.quote || '独得馒头大人偏爱，本宫很满意。'}"
+                            </p>
+
+                            <div class="w-full bg-yellow-200/60 rounded-full h-3.5 p-0.5 mb-2 shadow-inner">
+                                <div class="bg-gradient-to-r from-amber-400 to-rose-500 h-2.5 rounded-full transition-all duration-500" style="width: ${Math.min(100, (empress.favor / 150) * 100)}%"></div>
+                            </div>
+
+                            <div class="flex items-center justify-between text-xs font-bold text-amber-950">
+                                <span>实时好感指数：<strong class="text-base text-rose-600 font-black">${empress.favor}</strong> 心分</span>
+                                <span class="text-amber-700">位居六宫之首</span>
+                            </div>
+                        </div>
+
+                        <div class="flex md:flex-col gap-2 justify-center">
+                            <button onclick="quickAdjustFavor('${empress.id}', 10, event)" class="bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs shadow hover:shadow-md transition-all flex items-center gap-1">
+                                <i class="fa-solid fa-heart"></i> 专宠 +10
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCharacterGrid(list) {
+            const grid = document.getElementById('characterGrid');
+
+            if (list.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-gray-400">
+                        <i class="fa-solid fa-heart-crack text-4xl mb-2 text-pink-200"></i>
+                        <p class="text-sm">后宫暂无匹配佳丽，快点击右上角“纳妃”吧！</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const allSorted = [...window.characters].sort((a, b) => b.favor - a.favor || b.updatedAt - a.updatedAt);
+
+            grid.innerHTML = list.map(char => {
+                const rankIndex = allSorted.findIndex(c => c.id === char.id) + 1;
+                const titleInfo = getFavorTitle(char.favor);
+
+                let badgeClass = "bg-gray-100 text-gray-600";
+                let badgeIcon = `<span class="font-bold">#${rankIndex}</span>`;
+                if (rankIndex === 1) {
+                    badgeClass = "bg-gradient-to-r from-yellow-300 to-amber-400 text-yellow-950 font-black shadow";
+                    badgeIcon = `<i class="fa-solid fa-crown text-amber-700"></i> 1`;
+                } else if (rankIndex === 2) {
+                    badgeClass = "bg-gradient-to-r from-slate-200 to-slate-300 text-slate-800 font-black shadow";
+                    badgeIcon = `<i class="fa-solid fa-medal text-slate-600"></i> 2`;
+                } else if (rankIndex === 3) {
+                    badgeClass = "bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black shadow";
+                    badgeIcon = `<i class="fa-solid fa-award text-amber-200"></i> 3`;
+                }
+
+                const colorThemeMap = {
+                    pink: 'border-pink-200/80 hover:border-pink-400',
+                    purple: 'border-purple-200/80 hover:border-purple-400',
+                    blue: 'border-blue-200/80 hover:border-blue-400',
+                    amber: 'border-amber-200/80 hover:border-amber-400',
+                    emerald: 'border-emerald-200/80 hover:border-emerald-400'
+                };
+
+                const cardBorder = colorThemeMap[char.color] || colorThemeMap.pink;
+
+                return `
+                    <div class="glass-card rounded-2xl p-5 border-2 ${cardBorder} transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative flex flex-col justify-between group">
+                        
+                        <div>
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1 ${badgeClass}">
+                                    ${badgeIcon}
+                                </span>
+                                <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="openEditModal('${char.id}')" class="text-gray-400 hover:text-pink-600 w-7 h-7 rounded-full flex items-center justify-center hover:bg-pink-50 transition-colors" title="编辑资料">
+                                        <i class="fa-solid fa-pen text-xs"></i>
+                                    </button>
+                                    <button onclick="deleteCharacter('${char.id}')" class="text-gray-400 hover:text-rose-600 w-7 h-7 rounded-full flex items-center justify-center hover:bg-rose-50 transition-colors" title="打入冷宫(删除)">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start gap-3.5 mb-3">
+                                <img src="${char.avatar}" onerror="this.src='https://placehold.co/100x100/ffe3ec/f83b82?text=Avatar'" class="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md flex-shrink-0">
+                                <div class="overflow-hidden">
+                                    <h3 class="font-bold text-gray-800 text-base sm:text-lg truncate">${char.name}</h3>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <span class="text-[10px] px-2 py-0.5 rounded-md font-bold ${titleInfo.color}">
+                                            ${titleInfo.rank} · ${titleInfo.title.split('/')[0]}
+                                        </span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1 mt-1.5">
+                                        ${(char.tags || []).map(t => `<span class="text-[10px] bg-white/80 text-pink-600 px-1.5 py-0.5 rounded border border-pink-100">${t}</span>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-xs text-gray-600 italic bg-white/50 p-2 rounded-xl border border-white/60 mb-3 line-clamp-2">
+                                "${char.quote || '暂无口头禅...'}"
+                            </p>
+
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center text-xs mb-1 font-bold">
+                                    <span class="text-pink-600 flex items-center gap-1">
+                                        <i class="fa-solid fa-heart text-rose-500 animate-pulse"></i> 好感值
+                                    </span>
+                                    <span class="text-gray-700 text-sm font-black">${char.favor}</span>
+                                </div>
+                                <div class="w-full bg-gray-200/70 rounded-full h-2.5 p-0.5">
+                                    <div class="bg-gradient-to-r from-pink-400 to-rose-500 h-1.5 rounded-full transition-all duration-300" style="width: ${Math.min(100, (char.favor / 120) * 100)}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-100 flex items-center justify-between gap-1">
+                            <div class="flex gap-1">
+                                <button onclick="quickAdjustFavor('${char.id}', -10, event)" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition-colors">-10</button>
+                                <button onclick="quickAdjustFavor('${char.id}', -1, event)" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition-colors">-1</button>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="quickAdjustFavor('${char.id}', 1, event)" class="px-2 py-1 bg-pink-100 hover:bg-pink-200 text-pink-600 text-xs font-bold rounded-lg transition-colors">+1</button>
+                                <button onclick="quickAdjustFavor('${char.id}', 10, event)" class="px-2 py-1 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 text-white text-xs font-bold rounded-lg shadow-sm transition-colors">+10</button>
+                            </div>
+                        </div>
+
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function createHeartPop(x, y, delta) {
+            const el = document.createElement('div');
+            el.className = 'heart-pop';
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+
+            if (delta > 0) {
+                el.style.color = '#f83b82';
+                el.innerHTML = `💖 +${delta}`;
+            } else {
+                el.style.color = '#6b7280';
+                el.innerHTML = `💔 ${delta}`;
+            }
+
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1200);
+        }
+
+        function openLogReasonModal(name, delta) {
+            const subtitle = document.getElementById('logReasonSubtitle');
+            subtitle.innerText = `角色「${name}」好感度 ${delta > 0 ? '+' + delta : delta}`;
+            document.getElementById('logReasonInput').value = '';
+            document.getElementById('logReasonModal').classList.remove('hidden');
+        }
+
+        function renderLogList() {
+            const container = document.getElementById('logList');
+            if (window.logs.length === 0) {
+                container.innerHTML = `<p class="text-center text-gray-400 py-6">暂无起居注变动记录...</p>`;
+                return;
+            }
+
+            container.innerHTML = window.logs.map(l => {
+                const dateStr = new Date(l.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                return `
+                    <div class="p-2.5 bg-gray-50 rounded-xl border border-pink-100 flex justify-between items-center">
+                        <div>
+                            <span class="font-bold text-gray-800">[${l.operator || '朋友'}]</span>
+                            <span class="font-bold text-pink-600 ml-1">${l.name}</span>
+                            <span class="text-gray-500 ml-1">(${l.reason})</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold ${l.delta > 0 ? 'text-pink-600' : 'text-gray-500'}">
+                                ${l.delta > 0 ? '+' + l.delta : l.delta}
+                            </span>
+                            <span class="text-[10px] text-gray-400">${dateStr}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.openAddModal = function() {
+            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-heart"></i> 纳为佳丽`;
+            document.getElementById('characterForm').reset();
+            document.getElementById('charId').value = '';
+            document.getElementById('avatarPreview').src = DEFAULT_AVATARS[0];
+            document.getElementById('charAvatarUrl').value = DEFAULT_AVATARS[0];
+            document.getElementById('characterModal').classList.remove('hidden');
+        };
+
+        window.openEditModal = function(id) {
+            const char = window.characters.find(c => c.id === id);
+            if (!char) return;
+
+            document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-pen-to-square"></i> 编辑爱妃信息`;
+            document.getElementById('charId').value = char.id;
+            document.getElementById('charName').value = char.name;
+            document.getElementById('charAvatarUrl').value = char.avatar;
+            document.getElementById('avatarPreview').src = char.avatar;
+            document.getElementById('charFavor').value = char.favor;
+            document.getElementById('charColor').value = char.color || 'pink';
+            document.getElementById('charTags').value = (char.tags || []).join(', ');
+            document.getElementById('charQuote').value = char.quote || '';
+
+            document.getElementById('characterModal').classList.remove('hidden');
+        };
+
+        window.closeModal = function() {
+            document.getElementById('characterModal').classList.add('hidden');
+        };
+
+        window.toggleLogModal = function() {
+            const modal = document.getElementById('historyModal');
+            if (modal.classList.contains('hidden')) {
+                renderLogList();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        };
+
+        window.toggleDeployModal = function() {
+            const modal = document.getElementById('deployModal');
+            modal.classList.toggle('hidden');
+        };
+
+        window.triggerRandomInteration = function() {
+            if (window.characters.length === 0) {
+                alert('后宫暂无佳丽，请先添加角色！');
+                return;
+            }
+            const randomIndex = Math.floor(Math.random() * window.characters.length);
+            window.currentRandomChar = window.characters[randomIndex];
+
+            document.getElementById('randomCharAvatar').src = window.currentRandomChar.avatar;
+            document.getElementById('randomCharName').innerText = window.currentRandomChar.name;
+            document.getElementById('randomCharTitle').innerText = getFavorTitle(window.currentRandomChar.favor).title;
+            document.getElementById('randomCharQuote').innerText = window.currentRandomChar.quote || '今天也想和你多呆一会儿呢...';
+
+            document.getElementById('randomCardModal').classList.remove('hidden');
+        };
+
+        window.closeRandomModal = function() {
+            document.getElementById('randomCardModal').classList.add('hidden');
+        };
+
+        window.addFavorFromRandom = function(val) {
+            if (window.currentRandomChar) {
+                quickAdjustFavor(window.currentRandomChar.id, val, null);
+                closeRandomModal();
+            }
+        };
+
+        function initPresetAvatars() {
+            const container = document.getElementById('presetAvatars');
+            container.innerHTML = DEFAULT_AVATARS.map((url) => `
+                <img src="${url}" onclick="selectPresetAvatar('${url}')" class="w-8 h-8 rounded-full object-cover border-2 border-transparent hover:border-pink-500 cursor-pointer flex-shrink-0 transition-all">
+            `).join('');
+        }
+
+        window.selectPresetAvatar = function(url) {
+            document.getElementById('charAvatarUrl').value = url;
+            document.getElementById('avatarPreview').src = url;
+        };
+
+        function createBgHearts() {
+            const container = document.getElementById('heartBgContainer');
+            const icons = ['❤️', '💖', '🌸', '✨', '💕'];
+            for (let i = 0; i < 15; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'floating-heart-bg';
+                heart.style.left = `${Math.random() * 100}vw`;
+                heart.style.animationDuration = `${6 + Math.random() * 6}s`;
+                heart.style.animationDelay = `${Math.random() * 5}s`;
+                heart.style.fontSize = `${14 + Math.random() * 20}px`;
+                heart.innerText = icons[Math.floor(Math.random() * icons.length)];
+                container.appendChild(heart);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initPresetAvatars();
+            createBgHearts();
+            initAuthAndSync();
+        });
+    </script>
+</body>
+</html>
